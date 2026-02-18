@@ -67,9 +67,34 @@ Use `UNION` to pull data from other tables i.e.
 
 More info on union attacks: https://portswigger.net/web-security/sql-injection/union-attacks
 
+For a UNION query to work:
+
+- the individual queries must return the same number of columns
+- the data types in each column must be compatible between the queries
+
 ### Determining the number of columns required
 
+Use an ORDER BY clause:
 
+```sql
+ORDER BY 1--
+ORDER BY 2--
+ORDER BY 3--
+--etc.
+```
+
+If the index specified is higher than the number of columns the database will return an error
+
+Using UNION SELECT with dummy values:
+
+```sql
+--With NULL (convertible to every common data type)
+UNION SELECT NULL--
+UNION SELECT NULL,NULL--
+--etc.
+```
+
+**Lab: SQL injection UNION attack, determining the number of columns returned by the query**
 
 ## Blind SQl injection vulnerabilities
 
