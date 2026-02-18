@@ -99,3 +99,14 @@
 # | U+007D | &#125; | &#x7D; | } |
 # | U+007E | &#126; | &#x7E; | ~ |
 
+class Character:
+    def __init__(self, character, hex_char_ref, dec_char_ref):
+        self.character = character
+        self.hex_char_ref = hex_char_ref
+        self.dec_char_ref = dec_char_ref
+
+
+characters = []
+hex_char_refs = []
+dec_char_refs = []
+
