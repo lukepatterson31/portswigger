@@ -106,6 +106,8 @@ class Character:
         self.dec_char_ref = dec_char_ref
 
 
+# Use byte string of the chracter as the key and the chracter reference as the value
+
 characters = []
 hex_char_refs = []
 dec_char_refs = []

